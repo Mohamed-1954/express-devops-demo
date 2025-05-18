@@ -25,7 +25,9 @@ const students = pgTable("students", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => new Date()), // Automatically update on modification via Drizzle
+    .$onUpdate(() => new Date()),
 });
+
+export type Student = typeof students.$inferSelect;
 
 export default students;
