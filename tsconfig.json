@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "types": ["node"],
-    "typeRoots": ["./node_modules/@types"],
+    "types": ["node", "vitest/globals"],
+    "typeRoots": ["./types", "./node_modules/@types", "./node_modules"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Node",

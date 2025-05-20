@@ -1,0 +1,11 @@
+process.env.NODE_ENV = 'test';
+process.env.SERVER_HOST = 'localhost';
+process.env.SERVER_PORT = '3000';
+process.env.CORS_ORIGINS = 'http://localhost:5173';
+
+// Mock database environment variables
+process.env.DB_HOST = 'localhost';
+process.env.DB_USER = 'postgres';
+process.env.DB_PASSWORD = 'Simo@Postgres1954';
+process.env.DB_NAME = 'demo_devops_db';
+process.env.DB_PORT = '5432'; // Use a different port for test DB if needed

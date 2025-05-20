@@ -3,6 +3,7 @@ import db from "@/db";
 import type { UpdateStudentByIdRequest } from "./request-types";
 import { students } from "@/db/schemas";
 import { eq } from "drizzle-orm";
+import { updateStudentSchema } from "./validations";
 
 export const getAllStudents = async (req: Request, res: Response) => {
   try {
@@ -22,19 +23,21 @@ export const getAllStudents = async (req: Request, res: Response) => {
 
 export const updateStudentById = async (req: UpdateStudentByIdRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    if (!id) {
+    console.log("Request params:", req.params);
+
+    const { error, data } = updateStudentSchema.safeParse({ studentId: req.params.id, ...req.body});
+    if (error) {
+      res.status(400).json({ message: "Invalid data provided.", error });
+      return;
+    }
+
+    if (!data.studentId) {
       res.status(400).json({ message: "Student ID is required." });
       return;
     }
-
-    if (req.body && Object.keys(req.body).length === 0) {
-      res.status(400).json({ message: "No data provided for update." });
-      return;
-    }
-
+    
     const studentExists = await db.query.students.findFirst({
-      where: eq(students.studentId, id),
+      where: eq(students.studentId, data.studentId),
     });
 
     if (!studentExists) {
@@ -43,14 +46,9 @@ export const updateStudentById = async (req: UpdateStudentByIdRequest, res: Resp
     };
 
     const student = await db.update(students)
-      .set(req.body)
-      .where(eq(students.studentId, id))
+      .set(data)
+      .where(eq(students.studentId, data.studentId))
       .returning();
-
-    if (!student) {
-      res.status(404).json({ message: "No student found in the database." });
-      return;
-    }
 
     res.status(200).json(student);
   } catch (error) {

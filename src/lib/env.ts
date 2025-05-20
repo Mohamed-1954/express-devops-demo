@@ -4,7 +4,7 @@ import { expand } from "dotenv-expand";
 import { ZodError, z } from "zod";
 
 const EnvSchema = z.object({
-    NODE_ENV: z.enum(["development", "production"]).default("development"),
+    NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     SERVER_HOST: z.string().default("localhost"),
     SERVER_PORT: z.coerce.number().default(3000),
     CORS_ORIGINS: z.string().default("http://localhost:5173"),
