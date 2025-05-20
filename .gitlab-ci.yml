@@ -1,0 +1,91 @@
+# .gitlab-ci.yml
+image: node:21.2.0
+
+services:
+  - name: postgres:15
+    alias: pg_test_db # Changé pour éviter confusion potentielle
+    variables:
+      POSTGRES_DB: ci_student_db
+      POSTGRES_USER: ci_user
+      POSTGRES_PASSWORD: ci_password
+    command: ["postgres", "-c", "log_statement=all"]
+
+variables:
+  NODE_ENV: test
+  PORT: 3002 # Différent du port par défaut
+  DB_HOST: pg_test_db # Correspond à l'alias du service
+  DB_USER: ci_user
+  DB_PASSWORD: ci_password
+  DB_NAME: ci_student_db
+  DB_PORT: 5432
+  # DB_URL sera construit dans before_script
+  CI_PNPM_STORE_PATH: "${CI_PROJECT_DIR}/.pnpm-store" # Définit le chemin du store pnpm dans le projet
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}-pnpm
+  paths:
+    - ${CI_PNPM_STORE_PATH} # Cache le store pnpm défini ci-dessus
+    - node_modules/ # Cache aussi node_modules local au projet
+
+before_script:
+  - 'echo "Node version: $(node -v), PNPM version: $(corepack pnpm -v)"'
+  - corepack enable
+  - corepack pnpm config set store-dir ${CI_PNPM_STORE_PATH} # Configure pnpm pour utiliser le store dans le cache
+  - corepack pnpm install --frozen-lockfile # Installe les dépendances
+  - export DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+  - 'echo "DB_URL (for CI): $DB_URL"'
+  - apt-get update -qy && apt-get install -y postgresql-client || apk add --no-cache postgresql-client
+  - echo "Attente de PostgreSQL..."
+  - until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME"; do sleep 1; echo -n "."; done
+  - echo "PostgreSQL prêt."
+  - echo "Exécution des migrations Drizzle..."
+  # Le script db:migrate doit utiliser DB_URL de l'environnement.
+  # Si votre script `pnpm db:migrate` (ex: `tsx src/db/migrate.ts`) lit bien process.env.DB_URL, c'est bon.
+  - corepack pnpm db:migrate
+  - echo "Migrations terminées."
+
+stages:
+  - setup_dependencies # Renommé pour clarté
+  - lint
+  - test
+  - build
+  # - deploy # Sera ajouté si on choisit une méthode de déploiement depuis CI
+
+install_dependencies: # Renommé
+  stage: setup_dependencies
+  script:
+    - echo "Dépendances installées et migrations exécutées dans before_script global."
+
+lint_code:
+  stage: lint
+  script:
+    - corepack pnpm lint
+
+run_tests:
+  stage: test
+  script:
+    - corepack pnpm test
+  coverage: '/^Statements\s*:\s*([\d\.]+)/' # Regex pour la couverture dans les logs du job GitLab
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura # Vitest doit générer un rapport lcov, GitLab utilisera cobertura
+        path: coverage/lcov.info # Chemin vers le rapport lcov généré par Vitest
+      # junit: Remplacer par le rapport JUnit de Vitest si vous en générez un
+
+build_project:
+  stage: build
+  script:
+    - corepack pnpm build
+    - echo "Build terminé. Artefacts dans dist/."
+  artifacts:
+    paths:
+      - dist/
+      - package.json
+      - pnpm-lock.yaml
+      - tsconfig.json # Important pour l'exécution de `dist`
+      - src/db/migrations/ # Pour que la plateforme de déploiement puisse les exécuter
+      # Ajoutez d'autres fichiers nécessaires à l'exécution de `dist/index.js`
+      # (ex: si vous copiez des assets dans dist/ via tsup)
+    expire_in: 1 week
